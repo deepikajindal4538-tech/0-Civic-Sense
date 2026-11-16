@@ -11,6 +11,10 @@ const translations = {
         "nav_about_us": "About Us",
         "nav_contact_us": "Contact Us",
         "nav_account": "Account",
+        // Theme
+        "theme_toggle": "Theme",
+        "theme_light": "Light Mode",
+        "theme_dark": "Dark Mode",
         // Drawer
         "account_menu": "Account Menu",
         "user_profile": "User Profile",
@@ -238,6 +242,9 @@ const translations = {
         // Contact
         "contact_title": "CivicConnect से संपर्क करें",
         "contact_subtitle": "संचालन मुख्यालय से सुरक्षित रूप से संपर्क करें या आपातकालीन बुनियादी ढांचा प्रतिक्रिया शुरू करें।",
+        "theme_toggle": "थीम",
+        "theme_light": "लाइट मोड",
+        "theme_dark": "डार्क मोड",
         "emergency_hotlines": "आपातकालीन हेल्पलाइन",
         "official_directories": "आधिकारिक निर्देशिकाएं",
         "central_hq": "केंद्रीय मुख्यालय कार्यालय",
@@ -291,11 +298,13 @@ const translations = {
 let issuesData = [];
 let currentUser = null;
 let intendedRoute = null;
+let currentLang = 'en';
 
 // --- Initialization ---
 document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     initDrawer();
+    initThemeToggle();
     initLanguageToggle();
     initFeedControls();
     initReportForm();
@@ -308,6 +317,92 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fetch data for public feed at launch
     fetchIssues();
 });
+
+// --- Theme Logic ---
+function initThemeToggle() {
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    const topThemeBtn = document.getElementById('top-theme-toggle-btn');
+    const drawerThemeBtn = document.getElementById('drawer-theme-toggle-btn');
+
+    function getTheme() {
+        const saved = localStorage.getItem('civic_theme');
+        if (saved) return saved;
+        return document.documentElement.getAttribute('data-theme') || 'dark';
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('civic_theme', theme);
+        updateThemeUI(theme);
+    }
+
+    function updateThemeUI(theme) {
+        const isLight = theme === 'light';
+        const nextTheme = isLight ? 'dark' : 'light';
+        
+        // Header main button
+        if (themeBtn) {
+            themeBtn.setAttribute('title', isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode');
+            themeBtn.setAttribute('aria-label', isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode');
+            const icon = themeBtn.querySelector('i');
+            if (icon) {
+                icon.className = isLight ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+            }
+        }
+
+        // Top utility button
+        if (topThemeBtn) {
+            topThemeBtn.setAttribute('title', isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode');
+            const icon = topThemeBtn.querySelector('i');
+            if (icon) {
+                icon.className = isLight ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+            }
+            const text = document.getElementById('top-theme-text');
+            if (text) {
+                const lang = currentLang || 'en';
+                text.innerText = isLight ? (translations[lang]?.theme_dark || 'Dark Mode') : (translations[lang]?.theme_light || 'Light Mode');
+            }
+        }
+
+        // Drawer button
+        if (drawerThemeBtn) {
+            const icon = document.getElementById('drawer-theme-icon');
+            if (icon) {
+                icon.className = isLight ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+            }
+            const text = document.getElementById('drawer-theme-text');
+            if (text) {
+                const lang = currentLang || 'en';
+                text.innerText = isLight ? (translations[lang]?.theme_dark || 'Dark Mode') : (translations[lang]?.theme_light || 'Light Mode');
+            }
+            const badge = document.getElementById('drawer-theme-mode-badge');
+            if (badge) {
+                badge.innerText = isLight ? 'Light' : 'Dark';
+            }
+        }
+    }
+
+    window.updateThemeLabels = function() {
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        updateThemeUI(theme);
+    };
+
+    function toggle() {
+        const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        const next = current === 'light' ? 'dark' : 'light';
+        applyTheme(next);
+    }
+
+    [themeBtn, topThemeBtn, drawerThemeBtn].filter(Boolean).forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggle();
+        });
+    });
+
+    // Initial sync
+    applyTheme(getTheme());
+}
 
 // --- Drawer Logic ---
 function initDrawer() {
@@ -351,12 +446,14 @@ function initLanguageToggle() {
             clicked.style.opacity = '1';
             
             const lang = clicked.getAttribute('data-lang');
+            currentLang = lang;
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
                 if(translations[lang] && translations[lang][key]) {
                     el.innerText = translations[lang][key];
                 }
             });
+            if (window.updateThemeLabels) window.updateThemeLabels();
         });
     });
 }

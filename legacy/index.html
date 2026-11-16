@@ -13,6 +13,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Styles -->
     <link rel="stylesheet" href="../frontend/src/index.css">
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('civic_theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } catch(e) {}
+        })();
+    </script>
 </head>
 
 <body>
@@ -34,6 +42,9 @@
                         <button class="lang-btn" data-lang="hi"
                             style="background: transparent; border: none; color: var(--text-main); font-weight: 600; cursor: pointer; opacity: 0.5;">HI</button>
                     </div>
+                    <button id="top-theme-toggle-btn" class="utility-theme-btn" title="Toggle theme" aria-label="Toggle theme">
+                        <i class="fa-solid fa-sun"></i> <span id="top-theme-text" data-i18n="theme_light">Light Mode</span>
+                    </button>
                     <a href="#" class="utility-link"><i class="fa-solid fa-headset"></i> <span
                             data-i18n="help_support">Help & Support</span></a>
 
@@ -71,7 +82,10 @@
                                     Us</span></a></li>
                     </ul>
                 </nav>
-                <div class="nav-actions">
+                <div class="nav-actions" style="display: flex; align-items: center; gap: 12px;">
+                    <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle theme" aria-label="Toggle theme">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
                     <a href="#" class="btn-primary" id="menu-toggle-btn"
                         style="padding: 10px 20px; font-size: 0.9rem; text-decoration: none;">
                         <i class="fa-solid fa-bars"></i> <span style="margin-left:6px;"
@@ -120,6 +134,15 @@
                                 style="margin-right:12px; width: 20px; text-align: center;"></i> <span
                                 data-i18n="admin_dashboard">Admin Dashboard</span>
                         </a>
+                    </li>
+                    <li id="drawer-item-theme">
+                        <button id="drawer-theme-toggle-btn" class="nav-link" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px; background: transparent; border: none; font-size: 0.95rem; cursor: pointer; text-align: left; color: var(--text-main);">
+                            <span style="display: flex; align-items: center;">
+                                <i id="drawer-theme-icon" class="fa-solid fa-sun" style="margin-right:12px; width: 20px; text-align: center; color: var(--color-primary);"></i>
+                                <span id="drawer-theme-text" data-i18n="theme_light">Light Mode</span>
+                            </span>
+                            <span class="theme-mode-badge" id="drawer-theme-mode-badge" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; background: var(--bg-surface-hover); border: 1px solid var(--border-glass); color: var(--text-muted);">Dark</span>
+                        </button>
                     </li>
                 </ul>
 
