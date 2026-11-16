@@ -28,6 +28,8 @@ const translations = {
         "login_btn": "Log In",
         // Feed
         "top_issues": "Top Issues in your area",
+        "live_feed": "Live Feed",
+        "feed_subtitle": "Verified community issue reports and real-time municipal resolution tracking",
         "btn_list": "List",
         "btn_map": "Map",
         "map_overlay": "Interactive Issue Map (Simulated)",
@@ -170,6 +172,8 @@ const translations = {
         "login_btn": "लॉग इन",
         // Feed
         "top_issues": "आपके क्षेत्र की प्रमुख समस्याएं",
+        "live_feed": "लाइव फ़ीड",
+        "feed_subtitle": "सत्यापित नागरिक रिपोर्टें और वास्तविक समय नगरपालिका समाधान ट्रैकिंग",
         "btn_list": "सूची",
         "btn_map": "नक्शा",
         "map_overlay": "इंटरैक्टिव समस्या मानचित्र (अनुकरण)",
@@ -299,6 +303,8 @@ let issuesData = [];
 let currentUser = null;
 let intendedRoute = null;
 let currentLang = 'en';
+let currentFeedFilter = 'all';
+let feedSearchKeyword = '';
 
 // --- Initialization ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -883,9 +889,35 @@ function switchToSection(targetId, navLinks, sections, pageTitle, titleText) {
 // --- Feed Render ---
 function renderFeed() {
     const feedContainer = document.getElementById('feed-list');
+    if (!feedContainer) return;
     feedContainer.innerHTML = '';
 
-    issuesData.forEach(issue => {
+    const query = (feedSearchKeyword || '').toLowerCase().trim();
+    const filteredIssues = issuesData.filter(issue => {
+        if (currentFeedFilter !== 'all' && issue.status !== currentFeedFilter) return false;
+        if (query) {
+            const titleMatch = (issue.title || '').toLowerCase().includes(query);
+            const descMatch = (issue.desc || '').toLowerCase().includes(query);
+            const locMatch = (issue.location || '').toLowerCase().includes(query);
+            const authMatch = (issue.authority || '').toLowerCase().includes(query);
+            const catMatch = (issue.category || '').toLowerCase().includes(query);
+            if (!titleMatch && !descMatch && !locMatch && !authMatch && !catMatch) return false;
+        }
+        return true;
+    });
+
+    if (filteredIssues.length === 0) {
+        feedContainer.innerHTML = `
+            <div class="feed-empty-state">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <h3>No issues match your criteria</h3>
+                <p>Try searching for a different keyword or reset the status filters.</p>
+            </div>
+        `;
+        return;
+    }
+
+    filteredIssues.forEach(issue => {
         const card = document.createElement('div');
         card.className = 'issue-card glass-panel';
         
@@ -893,28 +925,30 @@ function renderFeed() {
         
         let escalationTag = '';
         if (issue.status === 'pending') {
-            const dateObj = new Date(issue.date);
+            const dateObj = new Date(issue.date || issue.createdAt || Date.now());
             const today = new Date();
             // Force random offsets for mockup representation if today matches
             const diffDays = Math.floor((today - dateObj) / (1000 * 60 * 60 * 24)) + (issue.id === 'ISS-002' ? 8 : (issue.id === 'ISS-001' ? 16 : 4));
             
             if (diffDays > 15) escalationTag = '<span class="tag tag-neglected"><i class="fa-solid fa-triangle-exclamation"></i> Neglected (15+ days)</span>';
             else if (diffDays > 7) escalationTag = '<span class="tag tag-escalated"><i class="fa-solid fa-fire"></i> Escalated (7+ days)</span>';
-            else if (diffDays > 3) escalationTag = '<span class="tag tag-reminder"><i class="fa-solid fa-clock"></i> Reminder Sent</span>';
+            else if (diffDays > 3) escalationTag = '<span class="tag tag-reminder"><i class="fa-solid fa-clock"></i> Reminder</span>';
         }
         
         let falseClosureBlock = '';
         if (issue.status === 'resolved' && !issue.falseResolution) {
             falseClosureBlock = `
-                <div style="width: 100%; border-top: 1px dashed var(--border-glass); margin-top: 12px; padding-top: 12px;">
-                    <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 8px;">Resolution Verified?</div>
-                    <button class="btn-secondary reopen-btn" data-id="${issue.id}" style="font-size: 0.8rem; color: #ef4444; border-color: #ef4444; padding: 4px 8px;">No, Issue Persists</button>
-                    <button class="btn-secondary" style="font-size: 0.8rem; color: #10b981; border-color: #10b981; padding: 4px 8px;">Yes, Verified</button>
+                <div style="width: 100%; border-top: 1px dashed var(--border-glass); margin-top: 12px; padding-top: 10px;">
+                    <div style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 6px;">Resolution Verified?</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-secondary reopen-btn" data-id="${issue.id}" style="font-size: 0.75rem; color: #ef4444; border-color: rgba(239, 68, 68, 0.4); padding: 4px 10px; border-radius: 6px;">No, Issue Persists</button>
+                        <button class="btn-secondary" style="font-size: 0.75rem; color: #10b981; border-color: rgba(16, 185, 129, 0.4); padding: 4px 10px; border-radius: 6px;">Yes, Verified</button>
+                    </div>
                 </div>
             `;
         }
 
-        let urgencyTag = issue.urgency ? `<span class="tag" style="background: rgba(255,255,255,0.1);">${issue.urgency} Urgency</span>` : '';
+        let urgencyTag = issue.urgency ? `<span class="tag" style="background: rgba(255,255,255,0.08);">${issue.urgency} Urgency</span>` : '';
 
         // Build existing comments HTML
         const commentsArr = issue.comments || [];
@@ -935,26 +969,32 @@ function renderFeed() {
             `;
         }).join('');
 
+        const dateStr = issue.date || (issue.createdAt ? new Date(issue.createdAt).toISOString().split('T')[0] : '');
+
         card.innerHTML = `
-            <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
-                <span class="status-badge ${issue.status}">${statusLabel}</span>
-                ${urgencyTag}
-                ${escalationTag}
-                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: auto;">${issue.date}</span>
+            <div class="card-header">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <span class="status-badge ${issue.status}">${statusLabel}</span>
+                    ${urgencyTag}
+                    ${escalationTag}
+                </div>
+                <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: auto;">${dateStr}</span>
             </div>
-            <img src="${issue.image}" alt="Issue" class="card-image">
+            <div class="card-image-wrap">
+                <img src="${issue.image}" alt="${issue.title}" class="card-image" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=600&q=80';">
+            </div>
             <div class="card-content">
-                <div style="font-size: 0.8rem; color: var(--color-primary); margin-bottom: 8px;"><i class="fa-solid fa-building-columns"></i> Routed to: ${issue.authority || 'Local Department'}</div>
+                <div class="card-dept-tag"><i class="fa-solid fa-building-columns"></i> ${issue.authority || 'Municipality (Civil)'}</div>
                 <h3>${issue.title}</h3>
                 <p>${issue.desc}</p>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;"><i class="fa-solid fa-user-pen"></i> Reported by: ${issue.reportedBy || 'Citizen'}</div>
+                <div class="card-meta-author"><i class="fa-solid fa-user-pen"></i> Reported by: ${issue.reportedBy || 'Citizen'}</div>
             </div>
-            <div class="card-footer" style="flex-wrap: wrap;">
-                <div class="location"><i class="fa-solid fa-location-dot"></i> ${issue.location}</div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-icon" style="color: var(--text-main);" onclick="window.open('https://wa.me/?text=Check out this civic issue: ${issue.title}', '_blank')"><i class="fa-brands fa-whatsapp"></i></button>
-                    <button class="upvote-btn ${issue.isVoted ? 'voted' : ''}" data-id="${issue.id}">
-                        <i class="fa-solid fa-circle-up"></i> 
+            <div class="card-footer">
+                <div class="location" title="${issue.location}"><i class="fa-solid fa-location-dot"></i> ${issue.location}</div>
+                <div class="card-actions">
+                    <button class="btn-share-icon" title="Share on WhatsApp" onclick="window.open('https://wa.me/?text=Check out this civic issue: ${encodeURIComponent(issue.title)}', '_blank')"><i class="fa-brands fa-whatsapp"></i></button>
+                    <button class="upvote-btn ${issue.isVoted ? 'voted' : ''}" data-id="${issue.id}" title="Upvote issue">
+                        <i class="fa-solid fa-arrow-up"></i> 
                         <span>${issue.upvotes}</span>
                     </button>
                     <button class="comment-toggle-btn" data-id="${issue.id}" title="Comments">
@@ -962,11 +1002,10 @@ function renderFeed() {
                         <span>${commentsArr.length}</span>
                     </button>
                 </div>
-                ${falseClosureBlock}
             </div>
+            ${falseClosureBlock}
             <!-- Comments Section -->
             <div class="comments-section" id="comments-${issue.id}" style="display: none;">
-                <div class="comments-divider"></div>
                 <div class="comments-header">
                     <i class="fa-solid fa-comments"></i>
                     <span>Comments (${commentsArr.length})</span>
@@ -1120,25 +1159,46 @@ async function toggleUpvote(id) {
     }
 }
 
-// --- Feed List/Map Toggles ---
+// --- Feed List/Map Toggles & Filters ---
 function initFeedControls() {
     const btnList = document.getElementById('btn-list-view');
     const btnMap = document.getElementById('btn-map-view');
     const feedList = document.getElementById('feed-list');
     const feedMap = document.getElementById('feed-map');
 
-    btnList.addEventListener('click', () => {
-        btnList.classList.add('active');
-        btnMap.classList.remove('active');
-        feedList.style.display = 'grid';
-        feedMap.style.display = 'none';
-    });
+    if (btnList && btnMap && feedList && feedMap) {
+        btnList.addEventListener('click', () => {
+            btnList.classList.add('active');
+            btnMap.classList.remove('active');
+            feedList.style.display = 'grid';
+            feedMap.style.display = 'none';
+        });
 
-    btnMap.addEventListener('click', () => {
-        btnMap.classList.add('active');
-        btnList.classList.remove('active');
-        feedList.style.display = 'none';
-        feedMap.style.display = 'block';
+        btnMap.addEventListener('click', () => {
+            btnMap.classList.add('active');
+            btnList.classList.remove('active');
+            feedList.style.display = 'none';
+            feedMap.style.display = 'block';
+        });
+    }
+
+    // Search bar filter
+    const searchInput = document.getElementById('feed-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            feedSearchKeyword = e.target.value;
+            renderFeed();
+        });
+    }
+
+    // Status filter pills
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            currentFeedFilter = e.currentTarget.getAttribute('data-filter');
+            renderFeed();
+        });
     });
 }
 
